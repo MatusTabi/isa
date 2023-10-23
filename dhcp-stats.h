@@ -3,9 +3,12 @@
 
 #include <stdint.h>
 #include <arpa/inet.h>
+#include <vector>
 
-struct options {
-
+struct dhcp_options {
+    size_t code;
+    size_t len;
+    std::vector<char> data;
 };
 
 struct dhcp_header {
@@ -23,11 +26,18 @@ struct dhcp_header {
     uint8_t CHAddr[16];
     uint8_t SName[64];
     uint8_t File[128];
-
+    std::vector<struct dhcp_options> options;
 };
 
 void packet_handler(unsigned char *args, const struct pcap_pkthdr *header, const unsigned char *packet);
 
-dhcp_header* create_dhcp_struct(const unsigned char *packet);
+size_t get_payload_offset(struct ip *ip_header);
+
+size_t get_payload_length(const struct pcap_pkthdr *header, size_t payload_offset);
+
+const unsigned char *get_payload_options(size_t payload_offset, const unsigned char *packet);
+
+void set_options(const unsigned char *dhcp_options, const unsigned char *packet, 
+                        const struct pcap_pkthdr *header, struct dhcp_header *dhcp);
 
 #endif
