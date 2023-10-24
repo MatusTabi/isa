@@ -1,6 +1,6 @@
 CC = g++
 CFLAGS = -Wall -Wextra -Werror
-LDLIBS = -lpcap
+LDLIBS = -lpcap -lncurses
 
 all: dhcp-stats
 

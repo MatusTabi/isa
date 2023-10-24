@@ -8,6 +8,8 @@
 #include <iomanip>
 #include <cstring>
 #include <vector>
+#include <curses.h>
+#include <unistd.h>
 
 #include "dhcp-stats.h"
 
@@ -19,6 +21,33 @@
 
 #define DHCP_OPTIONS_PAD 0
 #define DHCP_OPTIONS_END 255
+
+std::tuple<int, std::string> get_command_arguments(int argc, char **argv) {
+    int c;
+    while ((c = getopt(argc, argv, ":i:r:")) != -1) {
+        switch (c) {
+            case 'i': 
+                return std::tuple<int, std::string>{0x01, (std::string)optarg};
+            case 'r':
+                return std::tuple<int, std::string>{0x02, (std::string)optarg};
+            case '?':
+                fprintf(stderr, "Got unknown option.\n");
+                exit(EXIT_FAILURE);
+            default:
+                if (optopt == 'i') {
+                    fprintf(stderr, "-i option requires an argument.\n");
+                }
+                else if (optopt == 'r') {
+                    fprintf(stderr, "-r option requires an argument.\n");
+                }
+                else {
+                    fprintf(stderr, "Got unknown option.\n");
+                }
+                exit(EXIT_FAILURE);
+        }
+    }
+    return std::tuple<int, std::string>{0x00, NULL};
+}
 
 void packet_handler(unsigned char *args, const struct pcap_pkthdr *header, const unsigned char *packet) {
     (void) args;
@@ -42,12 +71,11 @@ const unsigned char *get_payload_options(size_t payload_offset, const unsigned c
 }
 
 void set_options(const unsigned char *dhcp_options, const unsigned char *packet, 
-                        const struct pcap_pkthdr *header, struct dhcp_header *dhcp) {                     
-    // size_t no_options = 0;
+                    const struct pcap_pkthdr *header, struct dhcp_header *dhcp) {                     
     while (dhcp_options < packet + header->len) {
         size_t length = 0;
         if (dhcp_options[0] == DHCP_OPTIONS_END) {
-            std::cout << "End of options." << std::endl;
+            std::cout << "End of options." << std::endl << std::endl;
             break;
         }
         if (dhcp_options[0] != DHCP_OPTIONS_PAD) {
@@ -65,38 +93,52 @@ void set_options(const unsigned char *dhcp_options, const unsigned char *packet,
 }
 
 int main(int argc, char **argv) {
-    (void) argc;
-    char *device, errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t *handle;
-    struct bpf_program bf;
+    std::tuple<int, std::string> file_device_tuple = get_command_arguments(argc, argv);
+    // std::string device;
+    // std::string file;
+    char errbuf[PCAP_ERRBUF_SIZE];
+    // char *file;
+    (void) errbuf;
+    // pcap_t *handle;
+    // struct bpf_program bf;
 
-    device = argv[1];
+    // initscr();                          // initialization of ncruses window
+    // mvprintw(10, 20, "Tu som");         // move cursor and print 
+    // refresh();                          // refresh after every move or print to flush memory
+    // mvprintw(12, 10, "Teraz som tu");
+    // getch();                            // waiting for user input
 
-    std::cout << device << std::endl;
-
-    handle = pcap_open_live(device, BUFSIZ, 1, 1000, errbuf);
-    if (handle == NULL) {
-        fprintf(stderr, "Couldn't open the device!\n");
-        exit(EXIT_FAILURE);
+    if (argc < 2) {
+        fprintf(stderr, "Enter at least some arguments please..\n");
+        return EXIT_FAILURE;
     }
+    
 
-    std::string filter_string = "udp and port 67 or port 68";
-    const char *filter = filter_string.c_str();
-    if (pcap_compile(handle, &bf, filter, 0, PCAP_NETMASK_UNKNOWN) == -1) {
-        fprintf(stderr, "Error at pcap_compile!\n");
-        exit(EXIT_FAILURE);
-    }
+    // device = argv[1];
+
+    // handle = pcap_open_live(device, BUFSIZ, 1, 1000, errbuf);
+    // handle = pcap_open_offline(device, errbuf);
+    // if (handle == NULL) {
+    //     fprintf(stderr, "Couldn't open the device!\n");
+    //     exit(EXIT_FAILURE);
+    // }
+
+    // std::string filter_string = "udp and port 67 or port 68";
+    // const char *filter = filter_string.c_str();
+    // if (pcap_compile(handle, &bf, filter, 0, PCAP_NETMASK_UNKNOWN) == -1) {
+    //     fprintf(stderr, "Error at pcap_compile!\n");
+    //     exit(EXIT_FAILURE);
+    // }
 
     
-    if (pcap_setfilter(handle, &bf) == -1) {
-        fprintf(stderr, "Error at pcap_setfilter!\n");
-        exit(EXIT_FAILURE);
-    }
+    // if (pcap_setfilter(handle, &bf) == -1) {
+    //     fprintf(stderr, "Error at pcap_setfilter!\n");
+    //     exit(EXIT_FAILURE);
+    // }
 
-    std::cout << "HERE I AM" << std::endl;
-
-    pcap_loop(handle, -1, packet_handler, NULL);
-
+    // pcap_loop(handle, -1, packet_handler, NULL);
     
+    endwin();
+
     return 0;
 }

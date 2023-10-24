@@ -29,6 +29,8 @@ struct dhcp_header {
     std::vector<struct dhcp_options> options;
 };
 
+std::tuple<int, std::string> get_command_arguments(int argc, char **argv);
+
 void packet_handler(unsigned char *args, const struct pcap_pkthdr *header, const unsigned char *packet);
 
 size_t get_payload_offset(struct ip *ip_header);
@@ -38,6 +40,6 @@ size_t get_payload_length(const struct pcap_pkthdr *header, size_t payload_offse
 const unsigned char *get_payload_options(size_t payload_offset, const unsigned char *packet);
 
 void set_options(const unsigned char *dhcp_options, const unsigned char *packet, 
-                        const struct pcap_pkthdr *header, struct dhcp_header *dhcp);
+                    const struct pcap_pkthdr *header, struct dhcp_header *dhcp);
 
 #endif
