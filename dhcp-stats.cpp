@@ -22,18 +22,11 @@
 
 void packet_handler(unsigned char *args, const struct pcap_pkthdr *header, const unsigned char *packet) {
     (void) args;
-    (void) header;
-
     struct ip *ip_header = (struct ip *)(packet + ETHER_HEADER_OFFSET);
-
     size_t payload_offset = get_payload_offset(ip_header);
-
-    struct dhcp_header *dhcp = new dhcp_header;
-
+    struct dhcp_header *dhcp = (struct dhcp_header *)packet + payload_offset;
     const unsigned char *dhcp_options = get_payload_options(payload_offset, packet);
-
     set_options(dhcp_options, packet, header, dhcp);
-
 }
 
 size_t get_payload_offset(struct ip *ip_header) {
@@ -69,68 +62,6 @@ void set_options(const unsigned char *dhcp_options, const unsigned char *packet,
         }
         dhcp_options += 2 + length;
     }
-}
-
-// dhcp_header *create_dhcp_struct(const unsigned char *packet, uint32_t packet_size) {
-    
-
-
-
-    // struct udphdr *udp_header = (struct udphdr *)(packet + sizeof(struct ethhdr) + (ip_header->ip_hl << 2));
-
-    // size_t option_length = calculate_options_size(packet, packet_size);
-    // (void) option_length;
-    // std::cout << option_length << std::endl;
-
-    // for (size_t i = 0; i < option_length; ++i) {
-    //     dhcp->options[i].code = 
-    // }
-
-    // unsigned char *udp_payload = (unsigned char *)udp_header + sizeof(struct udphdr);
-    // return (struct dhcp_header *)udp_payload;
-// }
-
-size_t calculate_options_size(const unsigned char *packet, uint32_t packet_size) {
-    // dhcp_header *dhcp = new dhcp_header;
-    // dhcp_header *dhcp = new dhcp_header;
-    // size_t option_total_lenght = 0;
-    (void) packet_size;
-    const unsigned char *packet_options_ptr = packet + DHCP_OPTIONS_OFFSET + 2;
-    std::cout << std::to_string(packet_options_ptr[0]) << std::endl;
-    return 0;
-    // while (packet_options_ptr < packet + packet_size) {
-    //     if (packet_options_ptr[0] == DHCP_OPTIONS_END) {
-    //         break;
-    //     }
-    //     if (packet_options_ptr + 2 < packet + packet_size) {
-    //         size_t option_lenght = packet_options_ptr[1];
-    //         // size_t code = packet_options_ptr[0];
-    //         // std::cout << "Code: " << code << std::endl;
-    //         // std::cout << "Length: " << option_lenght << std::endl;
-    //         option_total_lenght += 2 + option_lenght;
-    //         packet_options_ptr += 2 + option_lenght;
-    //     }
-    //     else {
-    //         std::cout << "Error occured when calculating option size." << std::endl;
-    //     }
-    // }
-    // dhcp->options = new dhcp_options[option_total_lenght];
-    // packet_options_ptr = packet + DHCP_OPTIONS_OFFSET;
-    // for (size_t i = 0; i < option_total_lenght; ++i) {
-    //     dhcp->options[i].code = packet_options_ptr[0];
-    //     dhcp->options[i].len = packet_options_ptr[1];
-    //     dhcp->options[i].data = new uint8_t[dhcp->options[i].len];
-    //     std::memcpy(dhcp->options[i].data, packet_options_ptr + 2, dhcp->options[i].len);
-    //     packet_options_ptr += 2 + dhcp->options[i].len;
-    // }
-    // for (size_t i = 0; i < option_total_lenght; ++i) {
-    //     if (dhcp->options[i].code != 0) {
-    //         std::cout << "Code: " << std::to_string(dhcp->options[i].code) << std::endl;
-    //         std::cout << "Length: " << std::to_string(dhcp->options[i].len) << std::endl;
-    //         std::cout << "Data: " << dhcp->options[i].data << std::hex << std::endl;
-    //     }
-    // }   
-    // return option_total_lenght;
 }
 
 int main(int argc, char **argv) {
