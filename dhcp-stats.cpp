@@ -23,6 +23,10 @@
 #define DHCP_OPTIONS_END 255
 
 std::tuple<int, std::string> get_command_arguments(int argc, char **argv) {
+    if (argc < 2) {
+        fprintf(stderr, "Enter at least some arguments please..\n");
+        exit(EXIT_FAILURE);
+    }
     int c;
     while ((c = getopt(argc, argv, ":i:r:")) != -1) {
         switch (c) {
@@ -94,49 +98,40 @@ void set_options(const unsigned char *dhcp_options, const unsigned char *packet,
 
 int main(int argc, char **argv) {
     std::tuple<int, std::string> file_device_tuple = get_command_arguments(argc, argv);
-    // std::string device;
-    // std::string file;
     char errbuf[PCAP_ERRBUF_SIZE];
-    // char *file;
-    (void) errbuf;
-    // pcap_t *handle;
-    // struct bpf_program bf;
+    pcap_t *handle;
+    struct bpf_program bf;
 
     // initscr();                          // initialization of ncruses window
     // mvprintw(10, 20, "Tu som");         // move cursor and print 
     // refresh();                          // refresh after every move or print to flush memory
     // mvprintw(12, 10, "Teraz som tu");
     // getch();                            // waiting for user input
-
-    if (argc < 2) {
-        fprintf(stderr, "Enter at least some arguments please..\n");
-        return EXIT_FAILURE;
+    if (std::get<0>(file_device_tuple) == 0x01) {
+        handle = pcap_open_live(std::get<1>(file_device_tuple).c_str(), BUFSIZ, 1, 1000, errbuf);
     }
-    
+    else if (std::get<0>(file_device_tuple) == 0x02) {
+        handle = pcap_open_offline(std::get<1>(file_device_tuple).c_str(), errbuf);
+    }
+    if (handle == NULL) {
+        fprintf(stderr, "Couldn't open the device!\n");
+        exit(EXIT_FAILURE);
+    }
 
-    // device = argv[1];
-
-    // handle = pcap_open_live(device, BUFSIZ, 1, 1000, errbuf);
-    // handle = pcap_open_offline(device, errbuf);
-    // if (handle == NULL) {
-    //     fprintf(stderr, "Couldn't open the device!\n");
-    //     exit(EXIT_FAILURE);
-    // }
-
-    // std::string filter_string = "udp and port 67 or port 68";
-    // const char *filter = filter_string.c_str();
-    // if (pcap_compile(handle, &bf, filter, 0, PCAP_NETMASK_UNKNOWN) == -1) {
-    //     fprintf(stderr, "Error at pcap_compile!\n");
-    //     exit(EXIT_FAILURE);
-    // }
+    std::string filter_string = "udp and port 67 or port 68";
+    const char *filter = filter_string.c_str();
+    if (pcap_compile(handle, &bf, filter, 0, PCAP_NETMASK_UNKNOWN) == -1) {
+        fprintf(stderr, "Error at pcap_compile!\n");
+        exit(EXIT_FAILURE);
+    }
 
     
-    // if (pcap_setfilter(handle, &bf) == -1) {
-    //     fprintf(stderr, "Error at pcap_setfilter!\n");
-    //     exit(EXIT_FAILURE);
-    // }
+    if (pcap_setfilter(handle, &bf) == -1) {
+        fprintf(stderr, "Error at pcap_setfilter!\n");
+        exit(EXIT_FAILURE);
+    }
 
-    // pcap_loop(handle, -1, packet_handler, NULL);
+    pcap_loop(handle, -1, packet_handler, NULL);
     
     endwin();
 
