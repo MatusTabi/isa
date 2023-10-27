@@ -29,7 +29,6 @@ std::vector<struct ip_prefixes> ip_addresses;
 void get_prefixes(int argc, char **argv) {
     for (int i = 0; i < argc; ++i) {
         if (std::regex_match(argv[i], std::regex("\\b\\d{1,3}(?:\\.\\d{1,3}){3}/\\d{1,2}\\b"))) {
-            // ips.prefixes->push_back((std::string)(argv[i]));
             struct ip_prefixes temp = {
                 .prefix = argv[i],
                 .max_hosts = count_max_hosts(argv[i]),
@@ -39,10 +38,6 @@ void get_prefixes(int argc, char **argv) {
             ip_addresses.push_back(temp);
         }  
     }
-    // std::cout << "CORRECT IP PREFIXES:" << std::endl;
-    // for (size_t i = 0; i < ips.prefixes->size(); ++i) {
-    //     std::cout << (*ips.prefixes)[i] << std::endl;
-    // }
 }
 
 int count_max_hosts(std::string ip_prefix) {
@@ -53,11 +48,8 @@ int count_max_hosts(std::string ip_prefix) {
 
 void print_app_header() {
     printw("IP-Prefix");
-    refresh();
     mvprintw(0, 20, "Max-hosts");
-    refresh();
     mvprintw(0, 35, "Allocated addresses");
-    refresh();
     mvprintw(0, 55, "Utilization");
     refresh();
 }
@@ -65,8 +57,8 @@ void print_app_header() {
 void print_info() {
     for (size_t i = 0; i < ip_addresses.size(); ++i) {
         mvprintw(i + 1, 0, (ip_addresses[i].prefix.c_str()));
-        refresh();
         mvprintw(i + 1, 20, (std::to_string(ip_addresses[i].max_hosts).c_str()));
+        refresh();
     }
 }
 
@@ -176,13 +168,7 @@ int main(int argc, char **argv) {
     std::tuple<int, std::string> file_device_tuple = get_command_arguments(argc, argv);
     char errbuf[PCAP_ERRBUF_SIZE];
     pcap_t *handle = get_handle(file_device_tuple, errbuf);
-    struct bpf_program bf;
-
-    // mvprintw(10, 20, "Tu som");         // move cursor and print 
-    // refresh();                          // refresh after every move or print to flush memory
-    // mvprintw(12, 10, "Teraz som tu");
-    // getch();                            // waiting for user input
-
+    struct bpf_program bf;                          // waiting for user input
     std::string filter_string = "udp and port 67 or port 68";
     const char *filter = filter_string.c_str();
     if (pcap_compile(handle, &bf, filter, 0, PCAP_NETMASK_UNKNOWN) == -1) {
