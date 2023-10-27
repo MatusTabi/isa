@@ -53,13 +53,32 @@ std::tuple<int, std::string> get_command_arguments(int argc, char **argv) {
     return std::tuple<int, std::string>{0x00, NULL};
 }
 
+pcap_t *get_handle(std::tuple<int, std::string> file_device_tuple, char *errbuf) {
+    if (std::get<0>(file_device_tuple) == 0x01) {
+        return pcap_open_live(std::get<1>(file_device_tuple).c_str(), BUFSIZ, 1, 1000, errbuf);
+    }
+    else if (std::get<0>(file_device_tuple) == 0x02) {
+        return pcap_open_offline(std::get<1>(file_device_tuple).c_str(), errbuf);
+    }
+    else if (std::get<0>(file_device_tuple) == 0x00) {
+        fprintf(stderr, "No arguments were specified.\n");
+        exit(EXIT_FAILURE);
+    }
+    else {
+        return NULL;
+    }
+}
+
 void packet_handler(unsigned char *args, const struct pcap_pkthdr *header, const unsigned char *packet) {
     (void) args;
     struct ip *ip_header = (struct ip *)(packet + ETHER_HEADER_OFFSET);
     size_t payload_offset = get_payload_offset(ip_header);
-    struct dhcp_header *dhcp = (struct dhcp_header *)packet + payload_offset;
+    // struct dhcp_header *dhcp = (struct dhcp_header*)packet + payload_offset;
+    struct dhcp_header *dhcp = new dhcp_header;
+    memcpy(dhcp, packet + payload_offset, sizeof(dhcp_header));
     const unsigned char *dhcp_options = get_payload_options(payload_offset, packet);
     set_options(dhcp_options, packet, header, dhcp);
+    delete_dhcp(dhcp);
 }
 
 size_t get_payload_offset(struct ip *ip_header) {
@@ -75,7 +94,8 @@ const unsigned char *get_payload_options(size_t payload_offset, const unsigned c
 }
 
 void set_options(const unsigned char *dhcp_options, const unsigned char *packet, 
-                    const struct pcap_pkthdr *header, struct dhcp_header *dhcp) {                     
+                    const struct pcap_pkthdr *header, struct dhcp_header *dhcp) {  
+    dhcp->options = new std::vector<struct dhcp_options>;                   
     while (dhcp_options < packet + header->len) {
         size_t length = 0;
         if (dhcp_options[0] == DHCP_OPTIONS_END) {
@@ -90,16 +110,21 @@ void set_options(const unsigned char *dhcp_options, const unsigned char *packet,
                 .len = length,
                 .data = std::vector<char>(dhcp_options + 2, dhcp_options + 2 + length)
             };
-            dhcp->options.push_back(temp);
+            dhcp->options->push_back(temp);
         }
         dhcp_options += 2 + length;
     }
 }
 
+void delete_dhcp(struct dhcp_header *dhcp) {
+    delete dhcp->options;
+    delete dhcp;
+}
+
 int main(int argc, char **argv) {
     std::tuple<int, std::string> file_device_tuple = get_command_arguments(argc, argv);
     char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t *handle;
+    pcap_t *handle = get_handle(file_device_tuple, errbuf);
     struct bpf_program bf;
 
     // initscr();                          // initialization of ncruses window
@@ -107,16 +132,6 @@ int main(int argc, char **argv) {
     // refresh();                          // refresh after every move or print to flush memory
     // mvprintw(12, 10, "Teraz som tu");
     // getch();                            // waiting for user input
-    if (std::get<0>(file_device_tuple) == 0x01) {
-        handle = pcap_open_live(std::get<1>(file_device_tuple).c_str(), BUFSIZ, 1, 1000, errbuf);
-    }
-    else if (std::get<0>(file_device_tuple) == 0x02) {
-        handle = pcap_open_offline(std::get<1>(file_device_tuple).c_str(), errbuf);
-    }
-    if (handle == NULL) {
-        fprintf(stderr, "Couldn't open the device!\n");
-        exit(EXIT_FAILURE);
-    }
 
     std::string filter_string = "udp and port 67 or port 68";
     const char *filter = filter_string.c_str();
@@ -133,7 +148,8 @@ int main(int argc, char **argv) {
 
     pcap_loop(handle, -1, packet_handler, NULL);
     
-    endwin();
+    // endwin();
+    
 
     return 0;
 }
