@@ -6,7 +6,10 @@
 #include <vector>
 
 struct ip_prefixes {
-    std::vector<std::string> *prefixes;
+    std::string prefix;
+    int max_hosts;
+    int allocated_addresses;
+    float utilization; 
 };
 
 struct dhcp_options {
@@ -34,6 +37,12 @@ struct dhcp_header {
 };
 
 void get_prefixes(int argc, char **argv);
+
+int count_max_hosts(std::string ip_prefix);
+
+void print_info();
+
+void print_app_header();
 
 std::tuple<int, std::string> get_command_arguments(int argc, char **argv);
 
