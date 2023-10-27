@@ -5,6 +5,10 @@
 #include <arpa/inet.h>
 #include <vector>
 
+struct ip_prefixes {
+    std::vector<std::string> *prefixes;
+};
+
 struct dhcp_options {
     size_t code;
     size_t len;
@@ -28,6 +32,8 @@ struct dhcp_header {
     uint8_t File[128];
     std::vector<struct dhcp_options> *options;
 };
+
+void get_prefixes(int argc, char **argv);
 
 std::tuple<int, std::string> get_command_arguments(int argc, char **argv);
 

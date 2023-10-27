@@ -10,6 +10,7 @@
 #include <vector>
 #include <curses.h>
 #include <unistd.h>
+#include <regex>
 
 #include "dhcp-stats.h"
 
@@ -21,6 +22,21 @@
 
 #define DHCP_OPTIONS_PAD 0
 #define DHCP_OPTIONS_END 255
+
+struct ip_prefixes ips;
+
+void get_prefixes(int argc, char **argv) {
+    ips.prefixes = new std::vector<std::string>;
+    for (int i = 0; i < argc; ++i) {
+        if (std::regex_match(argv[i], std::regex("\\b\\d{1,3}(?:\\.\\d{1,3}){3}/\\d{1,2}\\b"))) {
+            ips.prefixes->push_back((std::string)(argv[i]));
+        }  
+    }
+    // std::cout << "CORRECT IP PREFIXES:" << std::endl;
+    // for (size_t i = 0; i < ips.prefixes->size(); ++i) {
+    //     std::cout << (*ips.prefixes)[i] << std::endl;
+    // }
+}
 
 std::tuple<int, std::string> get_command_arguments(int argc, char **argv) {
     if (argc < 2) {
@@ -73,7 +89,6 @@ void packet_handler(unsigned char *args, const struct pcap_pkthdr *header, const
     (void) args;
     struct ip *ip_header = (struct ip *)(packet + ETHER_HEADER_OFFSET);
     size_t payload_offset = get_payload_offset(ip_header);
-    // struct dhcp_header *dhcp = (struct dhcp_header*)packet + payload_offset;
     struct dhcp_header *dhcp = new dhcp_header;
     memcpy(dhcp, packet + payload_offset, sizeof(dhcp_header));
     const unsigned char *dhcp_options = get_payload_options(payload_offset, packet);
@@ -122,6 +137,8 @@ void delete_dhcp(struct dhcp_header *dhcp) {
 }
 
 int main(int argc, char **argv) {
+    std::cout << std::endl;
+    get_prefixes(argc, argv);
     std::tuple<int, std::string> file_device_tuple = get_command_arguments(argc, argv);
     char errbuf[PCAP_ERRBUF_SIZE];
     pcap_t *handle = get_handle(file_device_tuple, errbuf);
