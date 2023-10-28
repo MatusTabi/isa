@@ -1,5 +1,5 @@
 #include <iostream>
-#include <pcap.h>
+#include <pcap/pcap.h>
 #include <net/ethernet.h>
 #include <netinet/ether.h>
 #include <netinet/udp.h>
@@ -23,13 +23,19 @@
 
 #define DHCP_OPTIONS_PAD 0
 #define DHCP_OPTIONS_END 255
+#define DHCP_MESSAGE_TYPE 53
 
 std::vector<struct ip_prefixes> ip_addresses;
+std::vector<struct in_addr> used_ips;
+std::vector<struct dhcp_options> options;
+int id = 0;
 
 void get_prefixes(int argc, char **argv) {
     for (int i = 0; i < argc; ++i) {
         if (std::regex_match(argv[i], std::regex("\\b\\d{1,3}(?:\\.\\d{1,3}){3}/\\d{1,2}\\b"))) {
+            id++;
             struct ip_prefixes temp = {
+                .id = id,
                 .prefix = argv[i],
                 .max_hosts = count_max_hosts(argv[i]),
                 .allocated_addresses = 0,
@@ -56,8 +62,10 @@ void print_app_header() {
 
 void print_info() {
     for (size_t i = 0; i < ip_addresses.size(); ++i) {
-        mvprintw(i + 1, 0, (ip_addresses[i].prefix.c_str()));
-        mvprintw(i + 1, 20, (std::to_string(ip_addresses[i].max_hosts).c_str()));
+        mvprintw(ip_addresses[i].id, 0, (ip_addresses[i].prefix.c_str()));
+        mvprintw(ip_addresses[i].id, 20, "%d", ip_addresses[i].max_hosts);
+        mvprintw(ip_addresses[i].id, 35, "%d", ip_addresses[i].allocated_addresses);
+        mvprintw(ip_addresses[i].id, 55, "%.2f", ip_addresses[i].utilization);
         refresh();
     }
 }
@@ -113,11 +121,68 @@ void packet_handler(unsigned char *args, const struct pcap_pkthdr *header, const
     (void) args;
     struct ip *ip_header = (struct ip *)(packet + ETHER_HEADER_OFFSET);
     size_t payload_offset = get_payload_offset(ip_header);
-    struct dhcp_header *dhcp = new dhcp_header;
-    memcpy(dhcp, packet + payload_offset, sizeof(dhcp_header));
+    // struct udphdr *udp = (struct udphdr *)packet + ETHER_HEADER_OFFSET + ip_header->ip_hl * 4;
+    // struct udphdr *udp = (struct udphdr *)((char *)ip_header + (ip_header->ip_hl << 2));
+    // (void) udp;
+    struct dhcp_header *dhcp = (struct dhcp_header *)(packet + payload_offset);
+    // std::cout << "Yiaddr: " << inet_ntoa(dhcp->YIAddr) << std::endl;
+    // = new std::vector<struct dhcp_options>;
+    // memcpy(dhcp, packet + payload_offset, sizeof(dhcp_header));
     const unsigned char *dhcp_options = get_payload_options(payload_offset, packet);
     set_options(dhcp_options, packet, header, dhcp);
-    delete_dhcp(dhcp);
+    ack_handle(dhcp, ip_header);
+    // delete_dhcp(dhcp);
+}
+
+void ack_handle(struct dhcp_header *dhcp, struct ip *ip_header) {
+    (void) dhcp;
+    (void) ip_header;
+    // std::vector<struct dhcp_options> &options_vector = *dhcp->options;
+    for (size_t i = 0; i < options.size(); ++i) {   
+        if (options[i].code == DHCP_MESSAGE_TYPE && options[i].data[0] == 0x05) {
+            assign_address_to_prefix(dhcp->YIAddr);
+        }
+    }
+}
+
+bool is_ip_assigned(struct in_addr ip_address) {
+    for (size_t i = 0; i < used_ips.size(); ++i) {
+        if (used_ips[i].s_addr == ip_address.s_addr) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void assign_address_to_prefix(struct in_addr ip_address) {
+    if (is_ip_assigned(ip_address)) {
+        return;
+    }
+    else {
+        used_ips.push_back(ip_address);
+    }
+    for (size_t i = 0; i < ip_addresses.size(); ++i) {
+        std::string ip = ip_addresses[i].prefix;
+        struct in_addr netmask, range;
+        if (inet_pton(AF_INET, ip.substr(0, ip.find('/')).c_str(), &range) <= 0) {
+            std::cerr << "Invalid ip prefix!" << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        int prefix = std::stoi(ip.substr(ip.find('/') + 1));
+        uint32_t mask = (0xFFFFFFFFu << (32 - prefix));
+        mask = htonl(mask);
+        memcpy(&netmask, &mask, sizeof(netmask));
+        ip_address.s_addr &= netmask.s_addr;
+        range.s_addr &= netmask.s_addr;
+        if (ip_address.s_addr == range.s_addr) {
+            ip_addresses[i].allocated_addresses++;
+            ip_addresses[i].utilization = (float)((float)ip_addresses[i].allocated_addresses
+                                            * 100.0f / (float)ip_addresses[i].max_hosts);
+            mvprintw(ip_addresses[i].id, 35, "%d", ip_addresses[i].allocated_addresses);
+            mvprintw(ip_addresses[i].id, 55, "%.2f%%", ip_addresses[i].utilization);
+            refresh();
+        }
+    }
 }
 
 size_t get_payload_offset(struct ip *ip_header) {
@@ -134,7 +199,8 @@ const unsigned char *get_payload_options(size_t payload_offset, const unsigned c
 
 void set_options(const unsigned char *dhcp_options, const unsigned char *packet, 
                     const struct pcap_pkthdr *header, struct dhcp_header *dhcp) {  
-    dhcp->options = new std::vector<struct dhcp_options>;                   
+    // dhcp->options = new std::vector<struct dhcp_options>;        
+    (void) dhcp;           
     while (dhcp_options < packet + header->len) {
         size_t length = 0;
         if (dhcp_options[0] == DHCP_OPTIONS_END) {
@@ -149,16 +215,15 @@ void set_options(const unsigned char *dhcp_options, const unsigned char *packet,
                 .len = length,
                 .data = std::vector<char>(dhcp_options + 2, dhcp_options + 2 + length)
             };
-            dhcp->options->push_back(temp);
+            options.push_back(temp);
         }
         dhcp_options += 2 + length;
     }
 }
 
-void delete_dhcp(struct dhcp_header *dhcp) {
-    delete dhcp->options;
-    delete dhcp;
-}
+// void delete_dhcp(struct dhcp_header *dhcp) {
+//     delete dhcp->options;
+// }
 
 int main(int argc, char **argv) {
     initscr();                          // initialization of ncruses window
@@ -168,6 +233,10 @@ int main(int argc, char **argv) {
     std::tuple<int, std::string> file_device_tuple = get_command_arguments(argc, argv);
     char errbuf[PCAP_ERRBUF_SIZE];
     pcap_t *handle = get_handle(file_device_tuple, errbuf);
+    if (handle == NULL) {
+        fprintf(stderr, "Error at handle\n");
+        exit(EXIT_FAILURE);
+    }
     struct bpf_program bf;                          // waiting for user input
     std::string filter_string = "udp and port 67 or port 68";
     const char *filter = filter_string.c_str();
@@ -181,11 +250,10 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Error at pcap_setfilter!\n");
         exit(EXIT_FAILURE);
     }
-
+    pcap_freecode(&bf);
     pcap_loop(handle, -1, packet_handler, NULL);
-
-
     getch();
     endwin();
+    pcap_close(handle);
     return 0;
 }
