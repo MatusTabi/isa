@@ -11,6 +11,7 @@
 #include <curses.h>
 #include <unistd.h>
 #include <math.h>
+#include <csignal>
 
 #include "dhcp-stats.h"
 
@@ -24,12 +25,18 @@
 #define DHCP_OPTIONS_END 255
 #define DHCP_MESSAGE_TYPE 53
 
+pcap_t *handle;
 std::vector<struct ip_prefixes> ip_addresses;
 std::vector<struct in_addr> used_ips;
-std::vector<struct dhcp_options> options;
 int id = 0;
 
 // TODO comments, dividing by zero, syslog, documentation, manual page (?)
+
+void signal_handler(int) {
+    endwin();
+    pcap_close(handle);
+    exit(EXIT_SUCCESS);
+}
 
 void get_prefixes(int argc, char **argv) {
     for (int i = 0; i < argc; ++i) {
@@ -72,7 +79,7 @@ void print_info() {
         mvprintw(ip_addresses[i].id, 0, (ip_addresses[i].prefix.c_str()));
         mvprintw(ip_addresses[i].id, 20, "%d", ip_addresses[i].max_hosts);
         mvprintw(ip_addresses[i].id, 35, "%d", ip_addresses[i].allocated_addresses);
-        mvprintw(ip_addresses[i].id, 55, "%.2f", ip_addresses[i].utilization);
+        mvprintw(ip_addresses[i].id, 55, "%.2f%%", ip_addresses[i].utilization);
         refresh();
     }
 }
@@ -124,21 +131,19 @@ pcap_t *get_handle(std::tuple<int, std::string> file_device_tuple, char *errbuf)
     }
 }
 
-void packet_handler(unsigned char *args, const struct pcap_pkthdr *header, const unsigned char *packet) {
-    (void) args;
+void packet_handler(unsigned char *, const struct pcap_pkthdr *header, const unsigned char *packet) {
     struct ip *ip_header = (struct ip *)(packet + ETHER_HEADER_OFFSET);
     size_t payload_offset = get_payload_offset(ip_header);
     struct dhcp_header *dhcp = (struct dhcp_header *)(packet + payload_offset);
     const unsigned char *dhcp_options = get_payload_options(payload_offset, packet);
-    set_options(dhcp_options, packet, header, dhcp);
-    ack_handle(dhcp, ip_header);
+    std::vector<struct dhcp_options> options;
+    set_options(dhcp_options, packet, header, &options);
+    ack_handle(dhcp, &options);
 }
 
-void ack_handle(struct dhcp_header *dhcp, struct ip *ip_header) {
-    (void) dhcp;
-    (void) ip_header;
-    for (size_t i = 0; i < options.size(); ++i) {   
-        if (options[i].code == DHCP_MESSAGE_TYPE && options[i].data[0] == 0x05) {
+void ack_handle(struct dhcp_header *dhcp, std::vector<struct dhcp_options> *options) {
+    for (size_t i = 0; i < options->size(); ++i) {   
+        if ((*options)[i].code == DHCP_MESSAGE_TYPE && (*options)[i].data[0] == 0x05) {
             assign_address_to_prefix(dhcp->YIAddr);
         }
     }
@@ -156,10 +161,8 @@ bool is_ip_assigned(struct in_addr ip_address) {
 void assign_address_to_prefix(struct in_addr ip_address) {
     if (is_ip_assigned(ip_address)) {
         return;
-    }
-    else {
-        used_ips.push_back(ip_address);
-    }
+    }        
+    used_ips.push_back(ip_address);
     for (size_t i = 0; i < ip_addresses.size(); ++i) {
         std::string ip = ip_addresses[i].prefix;
         struct in_addr netmask, range;
@@ -197,13 +200,10 @@ const unsigned char *get_payload_options(size_t payload_offset, const unsigned c
 }
 
 void set_options(const unsigned char *dhcp_options, const unsigned char *packet, 
-                    const struct pcap_pkthdr *header, struct dhcp_header *dhcp) {  
-    // dhcp->options = new std::vector<struct dhcp_options>;        
-    (void) dhcp;           
+                    const struct pcap_pkthdr *header, std::vector<struct dhcp_options> *options) {         
     while (dhcp_options < packet + header->len) {
         size_t length = 0;
         if (dhcp_options[0] == DHCP_OPTIONS_END) {
-            // std::cout << "End of options." << std::endl << std::endl;
             break;
         }
         if (dhcp_options[0] != DHCP_OPTIONS_PAD) {
@@ -214,15 +214,11 @@ void set_options(const unsigned char *dhcp_options, const unsigned char *packet,
                 .len = length,
                 .data = std::vector<char>(dhcp_options + 2, dhcp_options + 2 + length)
             };
-            options.push_back(temp);
+            options->push_back(temp);
         }
         dhcp_options += 2 + length;
     }
 }
-
-// void delete_dhcp(struct dhcp_header *dhcp) {
-//     delete dhcp->options;
-// }
 
 int main(int argc, char **argv) {
     std::tuple<int, std::string> file_device_tuple = get_command_arguments(argc, argv);
@@ -230,8 +226,9 @@ int main(int argc, char **argv) {
     print_app_header();
     get_prefixes(argc, argv);
     print_info();
+    signal(SIGINT, signal_handler);
     char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t *handle = get_handle(file_device_tuple, errbuf);
+    handle = get_handle(file_device_tuple, errbuf);
     if (handle == NULL) {
         fprintf(stderr, "Error at handle\n");
         exit(EXIT_FAILURE);
@@ -247,9 +244,10 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Error at pcap_setfilter!\n");
         exit(EXIT_FAILURE);
     }
-    pcap_freecode(&bf);
+    noecho();
     pcap_loop(handle, -1, packet_handler, NULL);
-    getch();
+    pcap_freecode(&bf);
+    while (getch() != KEY_RESIZE);
     endwin();
     pcap_close(handle);
     return 0;

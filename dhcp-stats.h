@@ -37,6 +37,8 @@ struct dhcp_header {
     // std::vector<struct dhcp_options> *options;
 };
 
+void signal_handler(int);
+
 void get_prefixes(int argc, char **argv);
 
 int count_max_hosts(std::string ip_prefix);
@@ -49,9 +51,9 @@ std::tuple<int, std::string> get_command_arguments(int argc, char **argv);
 
 pcap_t *get_handle(std::tuple<int, std::string> file_device_tuple, char *errbuf);
 
-void packet_handler(unsigned char *args, const struct pcap_pkthdr *header, const unsigned char *packet);
+void packet_handler(unsigned char *, const struct pcap_pkthdr *header, const unsigned char *packet);
 
-void ack_handle(struct dhcp_header *dhcp, struct ip *ip_header);
+void ack_handle(struct dhcp_header *dhcp, std::vector<struct dhcp_options> *options);
 
 bool is_ip_assigned(struct in_addr ip_address);
 
@@ -64,8 +66,6 @@ size_t get_payload_length(const struct pcap_pkthdr *header, size_t payload_offse
 const unsigned char *get_payload_options(size_t payload_offset, const unsigned char *packet);
 
 void set_options(const unsigned char *dhcp_options, const unsigned char *packet, 
-                    const struct pcap_pkthdr *header, struct dhcp_header *dhcp);
-
-void delete_dhcp(struct dhcp_header *dhcp);
+                    const struct pcap_pkthdr *header, std::vector<struct dhcp_options> *options);
 
 #endif
