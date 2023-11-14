@@ -31,6 +31,7 @@ std::vector<struct in_addr> used_ips;
 int id = 0;
 
 // TODO comments, dividing by zero, syslog, documentation, manual page (?)
+// TODO usage
 
 void signal_handler(int) {
     endwin();
@@ -131,7 +132,8 @@ pcap_t *get_handle(std::tuple<int, std::string> file_device_tuple, char *errbuf)
     }
 }
 
-void packet_handler(unsigned char *, const struct pcap_pkthdr *header, const unsigned char *packet) {
+void packet_handler(unsigned char *args, const struct pcap_pkthdr *header, const unsigned char *packet) {
+    (void) args;
     struct ip *ip_header = (struct ip *)(packet + ETHER_HEADER_OFFSET);
     size_t payload_offset = get_payload_offset(ip_header);
     struct dhcp_header *dhcp = (struct dhcp_header *)(packet + payload_offset);
@@ -189,10 +191,6 @@ void assign_address_to_prefix(struct in_addr ip_address) {
 
 size_t get_payload_offset(struct ip *ip_header) {
     return ETHER_HEADER_OFFSET + ip_header->ip_hl * 4 + UDP_HEADER_OFFSET;
-}
-
-size_t get_payload_length(const struct pcap_pkthdr *header, size_t payload_offset) {
-    return header->len - payload_offset;
 }
 
 const unsigned char *get_payload_options(size_t payload_offset, const unsigned char *packet) {
