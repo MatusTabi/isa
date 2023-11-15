@@ -24,6 +24,10 @@
 #define DHCP_OPTIONS_PAD 0
 #define DHCP_OPTIONS_END 255
 #define DHCP_MESSAGE_TYPE 53
+#define DHCP_OPTIONS_OVERLOAD 52
+
+#define SNAME_SIZE 64
+#define FILE_SIZE 128
 
 pcap_t *handle;
 std::vector<struct ip_prefixes> ip_addresses;
@@ -61,10 +65,9 @@ void get_prefixes(int argc, char **argv) {
     }
 }
 
-int count_max_hosts(std::string ip_prefix) {
-    size_t size = ip_prefix.size();
-    int prefix = std::stoi(ip_prefix.substr(size - 2, 2));
-    return (int)(pow(2, 32 - prefix) - 2);
+uint64_t count_max_hosts(std::string ip_prefix) {
+    int prefix = std::stoi(ip_prefix.substr(ip_prefix.find('/') + 1, ip_prefix.length()));
+    return (uint64_t)(pow(2, 32 - prefix) - 2);
 }
 
 void print_app_header() {
@@ -78,8 +81,8 @@ void print_app_header() {
 void print_info() {
     for (size_t i = 0; i < ip_addresses.size(); ++i) {
         mvprintw(ip_addresses[i].id, 0, (ip_addresses[i].prefix.c_str()));
-        mvprintw(ip_addresses[i].id, 20, "%d", ip_addresses[i].max_hosts);
-        mvprintw(ip_addresses[i].id, 35, "%d", ip_addresses[i].allocated_addresses);
+        mvprintw(ip_addresses[i].id, 20, "%ld", ip_addresses[i].max_hosts);
+        mvprintw(ip_addresses[i].id, 35, "%ld", ip_addresses[i].allocated_addresses);
         mvprintw(ip_addresses[i].id, 55, "%.2f%%", ip_addresses[i].utilization);
         refresh();
     }
@@ -102,7 +105,7 @@ std::tuple<int, std::string> get_command_arguments(int argc, char **argv) {
                 exit(EXIT_FAILURE);
             default:
                 if (optopt == 'i') {
-                    fprintf(stderr, "-i option requires an argument.\n");
+                    fprintf(stderr, "-i requires an argument.\n");
                 }
                 else if (optopt == 'r') {
                     fprintf(stderr, "-r option requires an argument.\n");
@@ -139,7 +142,7 @@ void packet_handler(unsigned char *args, const struct pcap_pkthdr *header, const
     struct dhcp_header *dhcp = (struct dhcp_header *)(packet + payload_offset);
     const unsigned char *dhcp_options = get_payload_options(payload_offset, packet);
     std::vector<struct dhcp_options> options;
-    set_options(dhcp_options, packet, header, &options);
+    set_options(dhcp_options, packet, header, &options, dhcp);
     ack_handle(dhcp, &options);
 }
 
@@ -182,7 +185,7 @@ void assign_address_to_prefix(struct in_addr ip_address) {
             ip_addresses[i].allocated_addresses++;
             ip_addresses[i].utilization = (float)((float)ip_addresses[i].allocated_addresses
                                             * 100.0f / (float)ip_addresses[i].max_hosts);
-            mvprintw(ip_addresses[i].id, 35, "%d", ip_addresses[i].allocated_addresses);
+            mvprintw(ip_addresses[i].id, 35, "%ld", ip_addresses[i].allocated_addresses);
             mvprintw(ip_addresses[i].id, 55, "%.2f%%", ip_addresses[i].utilization);
             refresh();
         }
@@ -198,7 +201,10 @@ const unsigned char *get_payload_options(size_t payload_offset, const unsigned c
 }
 
 void set_options(const unsigned char *dhcp_options, const unsigned char *packet, 
-                    const struct pcap_pkthdr *header, std::vector<struct dhcp_options> *options) {         
+                    const struct pcap_pkthdr *header, std::vector<struct dhcp_options> *options,
+                    struct dhcp_header *dhcp) { 
+    bool overload = false;     
+    char overload_code;
     while (dhcp_options < packet + header->len) {
         size_t length = 0;
         if (dhcp_options[0] == DHCP_OPTIONS_END) {
@@ -212,9 +218,66 @@ void set_options(const unsigned char *dhcp_options, const unsigned char *packet,
                 .len = length,
                 .data = std::vector<char>(dhcp_options + 2, dhcp_options + 2 + length)
             };
+            overload = options_overload(code, overload, &overload_code, temp.data);
             options->push_back(temp);
+            dhcp_options += 2 + length;
         }
-        dhcp_options += 2 + length;
+        else {
+            dhcp_options += 1;
+        }
+    }
+    set_overloaded_options(overload, overload_code, options, dhcp);
+}
+
+bool options_overload(size_t code, bool overload, char *overload_code,  std::vector<char> data) {
+    if (overload) {
+        return true;
+    }
+    if (code == DHCP_OPTIONS_OVERLOAD) {
+        *overload_code = data[0];
+        return true;
+    }
+    return false;
+}
+
+void set_overloaded_options(bool overload, char overload_code, std::vector<struct dhcp_options> *options,
+                    struct dhcp_header *dhcp) {
+    if (overload) {
+        switch (overload_code) {
+            case 0x01:
+                set_overload_options(options, dhcp->File, FILE_SIZE);
+                break;
+            case 0x02:
+                set_overload_options(options, dhcp->SName, SNAME_SIZE);
+                break;
+            case 0x03:
+                set_overload_options(options, dhcp->SName, SNAME_SIZE);
+                set_overload_options(options, dhcp->File, FILE_SIZE);
+                break;
+        }
+    }
+}
+
+void set_overload_options(std::vector<struct dhcp_options> *options, uint8_t *place, int size) {
+    int i = 0;
+    while (i < size) {
+        if (place[i] == DHCP_OPTIONS_END) {
+            break;
+        }
+        if (place[i] != DHCP_OPTIONS_PAD) {
+            size_t code = place[i];
+            size_t length = place[i + 1];
+            struct dhcp_options temp = {
+                .code = code,
+                .len = length,
+                .data = std::vector<char>(place + i + 2, place + i + 2 + length)
+            };
+            options->push_back(temp);
+            i += 2 + length;
+        }
+        else {
+            i += 1;
+        }
     }
 }
 

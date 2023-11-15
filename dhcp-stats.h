@@ -16,9 +16,9 @@ struct ip_prefixes {
     // IP prefix.
     std::string prefix;
     // Maximum hosts for prefix.
-    int max_hosts;
+    uint64_t max_hosts;
     // Number of allocated addresses for prefix.
-    int allocated_addresses;
+    uint64_t allocated_addresses;
     // Utilization
     float utilization;
 };
@@ -91,7 +91,7 @@ void get_prefixes(int argc, char **argv);
  * @param ip_prefix Ip address.
  * @return Maximum number of hosts for ip address.
 */
-int count_max_hosts(std::string ip_prefix);
+uint64_t count_max_hosts(std::string ip_prefix);
 
 /**
  * @brief Prints network prefix utilization statistics.
@@ -224,9 +224,23 @@ const unsigned char *get_payload_options(size_t payload_offset, const unsigned c
  * @param packet Pointer to packet.
  * @param header Packet information header.
  * @param options Vector of dhcp options.
+ * @param dhcp Dhcp packet.
  * @return void
 */
 void set_options(const unsigned char *dhcp_options, const unsigned char *packet, 
-                    const struct pcap_pkthdr *header, std::vector<struct dhcp_options> *options);
+                    const struct pcap_pkthdr *header, std::vector<struct dhcp_options> *options,
+                    struct dhcp_header *dhcp);
+
+/**
+ * 
+*/
+bool options_overload(size_t code, bool overload, char *overload_code, std::vector<char> data);
+
+void set_overloaded_options(bool overload, char overload_code, std::vector<struct dhcp_options> *options,
+                    struct dhcp_header *dhcp);
+
+void set_overload_options(std::vector<struct dhcp_options> *options, uint8_t *place, int size);
+
+void set_options_from_sname(std::vector<struct dhcp_options> *options, struct dhcp_header *dhcp);
 
 #endif
