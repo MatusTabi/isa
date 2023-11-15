@@ -232,15 +232,45 @@ void set_options(const unsigned char *dhcp_options, const unsigned char *packet,
                     struct dhcp_header *dhcp);
 
 /**
+ * @brief Checking if DHCP packet contains overload option.
  * 
+ * If DHCP packet contains overload option, function will set overload_code
+ * to value, where additional options are stored (File or SName).
+ * 
+ * @param code Code of option.
+ * @param overload DHCP packet contains overload option or not.
+ * @param overload_code Pointer to value, where options are stored.
+ * @param data Data of option.
+ * @return True if DHCP overload option is set, else false.
 */
 bool options_overload(size_t code, bool overload, char *overload_code, std::vector<char> data);
 
-void set_overloaded_options(bool overload, char overload_code, std::vector<struct dhcp_options> *options,
-                    struct dhcp_header *dhcp);
+/**
+ * @brief Setting options from SName and File.
+ * 
+ * Function will store every option into a vector of options depending on
+ * value stored in overload_code. If value is set to 0x01, function will
+ * set options from File, 0x02 from SName and 0x03 from both.
+ * 
+ * @param overload DHCP packet contains overload option or not. 
+ * @param overload_code Value where options are stored.
+ * @param options Pointer to vector of options.
+ * @param dhcp DHCP packet containing SName and File.
+ * @return void
+*/
+void overload_options(bool overload, char overload_code, std::vector<struct dhcp_options> *options,
+                        struct dhcp_header *dhcp);
 
+/**
+ * @brief Setting options from specific DHCP attribute.
+ * 
+ * Function will set each option from specified DHCP attribute.
+ * 
+ * @param options Pointer to vector of options.
+ * @param place DHCP attribute from which options will be read.
+ * @param size Fixed size of DHCP attribute. (SName is 64 bytes large, File is 128 bytes large).
+ * @return void
+*/
 void set_overload_options(std::vector<struct dhcp_options> *options, uint8_t *place, int size);
-
-void set_options_from_sname(std::vector<struct dhcp_options> *options, struct dhcp_header *dhcp);
 
 #endif

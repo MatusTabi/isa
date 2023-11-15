@@ -226,7 +226,7 @@ void set_options(const unsigned char *dhcp_options, const unsigned char *packet,
             dhcp_options += 1;
         }
     }
-    set_overloaded_options(overload, overload_code, options, dhcp);
+    overload_options(overload, overload_code, options, dhcp);
 }
 
 bool options_overload(size_t code, bool overload, char *overload_code,  std::vector<char> data) {
@@ -240,7 +240,7 @@ bool options_overload(size_t code, bool overload, char *overload_code,  std::vec
     return false;
 }
 
-void set_overloaded_options(bool overload, char overload_code, std::vector<struct dhcp_options> *options,
+void overload_options(bool overload, char overload_code, std::vector<struct dhcp_options> *options,
                     struct dhcp_header *dhcp) {
     if (overload) {
         switch (overload_code) {
