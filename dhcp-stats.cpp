@@ -34,8 +34,19 @@ std::vector<struct ip_prefixes> ip_addresses;
 std::vector<struct in_addr> used_ips;
 int id = 0;
 
-// TODO comments, dividing by zero, syslog, documentation, manual page (?)
+// TODO syslog, documentation, manual page (?)
 // TODO usage
+
+void print_usage() {
+    std::cerr << 
+        "USAGE:\n\n"
+        "./dhcp-stats [-r <filename>] [-i <interface-name>] <ip-prefix> [ <ip-prefix> [ ... ] ]\n\n"
+
+        "-r <filename> - statistics will be created from pcap files\n"
+        "-i <interface> - interface on which the program can listen\n\n"
+
+        "<ip-prefix> - the network range for which statistics will be created" << std::endl;
+}
 
 void signal_handler(int) {
     endwin();
@@ -90,7 +101,7 @@ void print_info() {
 
 std::tuple<int, std::string> get_command_arguments(int argc, char **argv) {
     if (argc < 2) {
-        fprintf(stderr, "Enter at least some arguments please..\n");
+        print_usage();
         exit(EXIT_FAILURE);
     }
     int c;
@@ -101,18 +112,10 @@ std::tuple<int, std::string> get_command_arguments(int argc, char **argv) {
             case 'r':
                 return std::tuple<int, std::string>{0x02, (std::string)optarg};
             case '?':
-                fprintf(stderr, "Got unknown option.\n");
+                print_usage();
                 exit(EXIT_FAILURE);
             default:
-                if (optopt == 'i') {
-                    fprintf(stderr, "-i requires an argument.\n");
-                }
-                else if (optopt == 'r') {
-                    fprintf(stderr, "-r option requires an argument.\n");
-                }
-                else {
-                    fprintf(stderr, "Got unknown option.\n");
-                }
+                print_usage();
                 exit(EXIT_FAILURE);
         }
     }
@@ -127,7 +130,7 @@ pcap_t *get_handle(std::tuple<int, std::string> file_device_tuple, char *errbuf)
         return pcap_open_offline(std::get<1>(file_device_tuple).c_str(), errbuf);
     }
     else if (std::get<0>(file_device_tuple) == 0x00) {
-        fprintf(stderr, "No arguments were specified.\n");
+        print_usage();
         exit(EXIT_FAILURE);
     }
     else {
@@ -173,6 +176,7 @@ void assign_address_to_prefix(struct in_addr ip_address) {
         struct in_addr netmask, range;
         if (inet_pton(AF_INET, ip.substr(0, ip.find('/')).c_str(), &range) <= 0) {
             std::cerr << "Invalid ip prefix!" << std::endl;
+            pcap_close(handle);
             exit(EXIT_FAILURE);
         }
         int prefix = std::stoi(ip.substr(ip.find('/') + 1));
@@ -288,21 +292,25 @@ int main(int argc, char **argv) {
     get_prefixes(argc, argv);
     print_info();
     signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
     char errbuf[PCAP_ERRBUF_SIZE];
     handle = get_handle(file_device_tuple, errbuf);
     if (handle == NULL) {
-        fprintf(stderr, "Error at handle\n");
+        std::cerr << "Could not create packet capture descriptor\n";
+        std::cerr << errbuf << std::endl;
         exit(EXIT_FAILURE);
     }
     struct bpf_program bf;
     std::string filter_string = "udp and port 67 or port 68";
     const char *filter = filter_string.c_str();
     if (pcap_compile(handle, &bf, filter, 0, PCAP_NETMASK_UNKNOWN) == -1) {
-        fprintf(stderr, "Error at pcap_compile!\n");
+        std::cerr << "Could not compile specified filter" << std::endl;
+        pcap_close(handle);
         exit(EXIT_FAILURE);
     }
     if (pcap_setfilter(handle, &bf) == -1) {
-        fprintf(stderr, "Error at pcap_setfilter!\n");
+        std::cerr << "Error when setting filter" << std::endl;
+        pcap_close(handle);
         exit(EXIT_FAILURE);
     }
     noecho();

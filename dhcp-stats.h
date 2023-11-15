@@ -59,6 +59,14 @@ struct dhcp_header {
     uint8_t SName[64];
     uint8_t File[128];
 };
+
+/**
+ * @brief Prints usage of application.
+ * 
+ * @return void
+*/
+void print_usage();
+
 /**
  * @brief Function for handling CTRL+C signal.
  * 
