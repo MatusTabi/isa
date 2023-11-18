@@ -283,8 +283,24 @@ void overload_options(bool overload, char overload_code, std::vector<struct dhcp
 */
 void set_overload_options(std::vector<struct dhcp_options> *options, uint8_t *place, int size);
 
+/**
+ * @brief Logging syslog message after exceeding 50% of allocations.
+ * 
+ * After exceeding 50% of allocations, function will log message into
+ * syslog and set boolean value so after assigning more ip addresses
+ * to given ip prefix program won't be spamming syslog.
+ * 
+ * @param ip_stats Ip prefix for which the 50% threshold will be checked.
+ * @param size Size of ip prefixes vector.
+ * @return void
+*/
 void log_message(struct ip_prefixes *ip_stats, size_t size);
 
+/**
+ * @brief Printing exceeding prefixes to standard output.
+ * 
+ * @return void
+*/
 void print_exceeded();
 
 #endif

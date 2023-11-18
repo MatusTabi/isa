@@ -34,8 +34,6 @@ pcap_t *handle;
 std::vector<struct ip_prefixes> ip_addresses;
 std::vector<struct in_addr> used_ips;
 
-// TODO documentation, manual page (?)
-
 void print_usage() {
     std::cerr << 
         "USAGE:\n\n"
