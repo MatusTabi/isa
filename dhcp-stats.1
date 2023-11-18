@@ -1,0 +1,31 @@
+.TH dhcp-stats 1 "18 November 2023" "1.0" "dhcp-stats man page"
+
+.SH NAME
+dhcp-stats \- displaying prefix utilization statistics
+
+.SH SYNOPSIS
+dhcp-stats [-r <filename>] [-i <interface-name>] <ip-prefix> [ <ip-prefix> [ ... ] ]
+
+.SH DESCRIPTION
+dhcp-stats is a console application that displays prefix utilization statistics. Program is monitoring DHCP
+traffic and updating statistics based on assigned ip addresses. 
+
+.SH OPTION
+.TP
+\fB\-r\fP \fIfilename\fP
+Statistics will be created from pcap files.
+
+.TP
+\fB\-i\fP \fIinterface\fP
+Interface on which the program can listen.
+
+.SH EXAMPLES
+.TP
+Program will listen on interface eth0 and will display statistics for prefixes 192.168.1.0/24, 192.168.0.0/22 and 172.16.32.0/24
+dhcp-stats -i eth0 192.168.1.0/24 192.168.0.0/22 172.16.32.0/24
+.TP
+Program will read DHCP traffic from pcap file and display statistics for given prefixes
+dhcp-stats -r file.pcap 192.168.1.0/24
+
+.SH SEE ALSO
+dhclient (8), pcap (3PCAP)
