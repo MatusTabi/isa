@@ -21,6 +21,7 @@ struct ip_prefixes {
     uint64_t allocated_addresses;
     // Utilization
     float utilization;
+    bool exceeded;
 };
 
 /**
@@ -193,7 +194,8 @@ bool is_ip_assigned(struct in_addr ip_address);
  * 
  * For each ip prefix specified in command line, function will copute
  * mask and use it for ip prefix and obtained ip from dhcp. If those two
- * ip addresses are equal, function will update prefix utilization statistics.
+ * ip addresses are equal and assigned ip is not network address or broadcast, 
+ * function will update prefix utilization statistics.
  * 
  * @param ip_address Obtained ip address.
  * @return void
@@ -280,5 +282,9 @@ void overload_options(bool overload, char overload_code, std::vector<struct dhcp
  * @return void
 */
 void set_overload_options(std::vector<struct dhcp_options> *options, uint8_t *place, int size);
+
+void log_message(struct ip_prefixes *ip_stats, size_t size);
+
+void print_exceeded();
 
 #endif

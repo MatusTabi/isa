@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <math.h>
 #include <csignal>
+#include <syslog.h>
 
 #include "dhcp-stats.h"
 
@@ -32,10 +33,8 @@
 pcap_t *handle;
 std::vector<struct ip_prefixes> ip_addresses;
 std::vector<struct in_addr> used_ips;
-int id = 0;
 
-// TODO syslog, documentation, manual page (?)
-// TODO usage
+// TODO documentation, manual page (?)
 
 void print_usage() {
     std::cerr << 
@@ -51,10 +50,13 @@ void print_usage() {
 void signal_handler(int) {
     endwin();
     pcap_close(handle);
+    closelog();
+    print_exceeded();
     exit(EXIT_SUCCESS);
 }
 
 void get_prefixes(int argc, char **argv) {
+    int id = 0;
     for (int i = 0; i < argc; ++i) {
         struct sockaddr_in sa;
         std::string ip = (std::string)argv[i];
@@ -68,7 +70,8 @@ void get_prefixes(int argc, char **argv) {
                     .prefix = argv[i],
                     .max_hosts = count_max_hosts(argv[i]),
                     .allocated_addresses = 0,
-                    .utilization = 0
+                    .utilization = 0,
+                    .exceeded = false
                 };
                 ip_addresses.push_back(temp);
             }
@@ -102,6 +105,7 @@ void print_info() {
 std::tuple<int, std::string> get_command_arguments(int argc, char **argv) {
     if (argc < 2) {
         print_usage();
+        closelog();
         exit(EXIT_FAILURE);
     }
     int c;
@@ -113,9 +117,11 @@ std::tuple<int, std::string> get_command_arguments(int argc, char **argv) {
                 return std::tuple<int, std::string>{0x02, (std::string)optarg};
             case '?':
                 print_usage();
+                closelog();
                 exit(EXIT_FAILURE);
             default:
                 print_usage();
+                closelog();
                 exit(EXIT_FAILURE);
         }
     }
@@ -131,6 +137,7 @@ pcap_t *get_handle(std::tuple<int, std::string> file_device_tuple, char *errbuf)
     }
     else if (std::get<0>(file_device_tuple) == 0x00) {
         print_usage();
+        closelog();
         exit(EXIT_FAILURE);
     }
     else {
@@ -173,26 +180,36 @@ void assign_address_to_prefix(struct in_addr ip_address) {
     used_ips.push_back(ip_address);
     for (size_t i = 0; i < ip_addresses.size(); ++i) {
         std::string ip = ip_addresses[i].prefix;
-        struct in_addr netmask, range;
+        struct in_addr range, netmask;
         if (inet_pton(AF_INET, ip.substr(0, ip.find('/')).c_str(), &range) <= 0) {
             std::cerr << "Invalid ip prefix!" << std::endl;
             pcap_close(handle);
+            closelog();
             exit(EXIT_FAILURE);
         }
         int prefix = std::stoi(ip.substr(ip.find('/') + 1));
         uint32_t mask = (0xFFFFFFFFu << (32 - prefix));
         mask = htonl(mask);
         memcpy(&netmask, &mask, sizeof(netmask));
-        ip_address.s_addr &= netmask.s_addr;
-        range.s_addr &= netmask.s_addr;
-        if (ip_address.s_addr == range.s_addr) {
-            ip_addresses[i].allocated_addresses++;
-            ip_addresses[i].utilization = (float)((float)ip_addresses[i].allocated_addresses
-                                            * 100.0f / (float)ip_addresses[i].max_hosts);
-            mvprintw(ip_addresses[i].id, 35, "%ld", ip_addresses[i].allocated_addresses);
-            mvprintw(ip_addresses[i].id, 55, "%.2f%%", ip_addresses[i].utilization);
-            refresh();
+        if ((ip_address.s_addr & netmask.s_addr) == (range.s_addr & netmask.s_addr)) {
+            if (ip_address.s_addr != range.s_addr && ip_address.s_addr != (range.s_addr | ~netmask.s_addr)) {
+                ip_addresses[i].allocated_addresses++;
+                ip_addresses[i].utilization = (float)((float)ip_addresses[i].allocated_addresses
+                                                * 100.0f / (float)ip_addresses[i].max_hosts);
+                log_message(&ip_addresses[i], ip_addresses.size());
+                mvprintw(ip_addresses[i].id, 35, "%ld", ip_addresses[i].allocated_addresses);
+                mvprintw(ip_addresses[i].id, 55, "%.2f%%", ip_addresses[i].utilization);
+                refresh();
+            }
         }
+    }
+}
+
+void log_message(struct ip_prefixes *ip_stats, size_t size) {
+    if (ip_stats->utilization >= 50.0f && !ip_stats->exceeded) {
+        syslog(LOG_WARNING, "prefix %s exceeded 50%% of allocations.\n", ip_stats->prefix.c_str());
+        mvprintw(size + ip_stats->id + 2, 0, "prefix %s exceeded 50%% of allocations.\n", ip_stats->prefix.c_str());
+        ip_stats->exceeded = true;
     }
 }
 
@@ -285,9 +302,18 @@ void set_overload_options(std::vector<struct dhcp_options> *options, uint8_t *pl
     }
 }
 
+void print_exceeded() {
+    for (size_t i = 0; i < ip_addresses.size(); ++i) {
+        if (ip_addresses[i].exceeded) {
+            std::cout << "prefix " << ip_addresses[i].prefix << " exceeded 50% of allocations." << std::endl;
+        }
+    }
+}
+
 int main(int argc, char **argv) {
+    openlog(NULL, LOG_PID | LOG_CONS, LOG_USER);
     std::tuple<int, std::string> file_device_tuple = get_command_arguments(argc, argv);
-    initscr();                          // initialization of ncruses window
+    initscr();        
     print_app_header();
     get_prefixes(argc, argv);
     print_info();
@@ -298,6 +324,7 @@ int main(int argc, char **argv) {
     if (handle == NULL) {
         std::cerr << "Could not create packet capture descriptor\n";
         std::cerr << errbuf << std::endl;
+        closelog();
         exit(EXIT_FAILURE);
     }
     struct bpf_program bf;
@@ -306,11 +333,15 @@ int main(int argc, char **argv) {
     if (pcap_compile(handle, &bf, filter, 0, PCAP_NETMASK_UNKNOWN) == -1) {
         std::cerr << "Could not compile specified filter" << std::endl;
         pcap_close(handle);
+        closelog();
+        endwin();
         exit(EXIT_FAILURE);
     }
     if (pcap_setfilter(handle, &bf) == -1) {
         std::cerr << "Error when setting filter" << std::endl;
         pcap_close(handle);
+        closelog();
+        endwin();
         exit(EXIT_FAILURE);
     }
     noecho();
@@ -319,5 +350,6 @@ int main(int argc, char **argv) {
     while (getch() != KEY_RESIZE);
     endwin();
     pcap_close(handle);
+    closelog();
     return 0;
 }
