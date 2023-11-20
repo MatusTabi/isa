@@ -1,8 +1,8 @@
 # ISA - Monitoring of DHCP communication
 
 ## Basic information
-Author: Matúš Tábi
-Login: xtabim01
+Author: Matúš Tábi \
+Login: xtabim01 \
 Created: 20/11/2023
 
 ## Brief description
@@ -26,4 +26,17 @@ README.md \
 dhcp-stats.1 \
 dhcp-stats.cpp \
 dhcp-stats.h \
-manual.pdf \
+manual.pdf
+
+## Resources
+
+[1] <{https://learn.microsoft.com/en-us/windows-server/networking/technologies/dhcp/dhcp-top}> \
+[2] <{https://en.wikipedia.org/wiki/Dynamic_Host_Configuration_Protocol}> \
+[3] <{https://techhub.hpe.com/eginfolib/networking/docs/switches/5120si/cg/5998-8491_l3-ip-svcs_cg/content/436042653.htm}> \
+[4] <{https://techhub.hpe.com/eginfolib/networking/docs/switches/5120si/cg/5998-8491_l3-ip-svcs_cg/content/436042655.htm}> \
+[5] <{https://techhub.hpe.com/eginfolib/networking/docs/switches/5120si/cg/5998-8491_l3-ip-svcs_cg/content/436042656.htm}> \
+[6] <{https://efficientip.com/glossary/dhcp-option/}> \
+[7] <{http://www.tcpipguide.com/free/t_DHCPMessageFormat.htm}> \
+[8] <{http://www.tcpipguide.com/free/t_DHCPOptionsOptionFormatandOptionOverloading.htm}> \
+[9] <{https://www.tcpdump.org/pcap.html}> \
+[10] <{https://dev.to/tbhaxor/introduction-to-ncurses-part-1-1bk5}>
