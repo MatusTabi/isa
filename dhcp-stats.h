@@ -1,3 +1,9 @@
+/**
+ * Project: Monitoring of DHCP communication
+ * Author: Matúš Tábi
+ * Login: xtabim01
+*/
+
 #ifndef DHCP_STATS_H
 #define DHCP_STATS_H
 

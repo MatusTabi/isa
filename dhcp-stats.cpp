@@ -1,3 +1,9 @@
+/**
+ * Project: Monitoring of DHCP communication
+ * Author: Matúš Tábi
+ * Login: xtabim01
+*/
+
 #include <iostream>
 #include <pcap/pcap.h>
 #include <net/ethernet.h>
