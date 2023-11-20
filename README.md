@@ -11,19 +11,19 @@ This project was created as a console application, which will be displaying IP p
 
 ## Usage
 
-./dhcp-stats [-r <filename>] [-i <interface-name>] <ip-prefix> [ <ip-prefix> [ ... ] ]
+./dhcp-stats [-r \<filename\>] [-i \<interface-name\>] \<ip-prefix\> [ \<ip-prefix\> [ ... ] ]
 
--r <filename> : specifies file from which will be IP prefix utilization statistics created.
+-r \<filename\> : specifies file from which will be IP prefix utilization statistics created.
 
--i <interface> : specifies an interface on which will program listen and display IP prefix utilization statistics.
+-i \<interface\> : specifies an interface on which will program listen and display IP prefix utilization statistics.
 
-<ip-prefix> : the network range for which statistics will be created. Unlimited number of IP prefixes can be specified. IP prefix must be in correct form, e.g. 192.168.1.0/24 . 
+\<ip-prefix\> : the network range for which statistics will be created. Unlimited number of IP prefixes can be specified. IP prefix must be in correct form, e.g. 192.168.1.0/24 . 
 
 ## List of uploaded files
 
-Makefile
-README.md
-dhcp-stats.1
-dhcp-stats.cpp
-dhcp-stats.h
-manual.pdf
+Makefile \
+README.md \
+dhcp-stats.1 \
+dhcp-stats.cpp \
+dhcp-stats.h \
+manual.pdf \
